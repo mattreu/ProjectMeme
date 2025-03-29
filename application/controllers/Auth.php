@@ -10,6 +10,10 @@ class Auth extends CI_Controller {
 		$this->load->helper(array('form', 'url'));
         $this->load->library(array('form_validation', 'session'));
 
+		if($this->session->is_logged){
+			redirect(base_url('index.php/content'));
+		}
+
 		$form_rules = array(
 			array(
 				'field' => 'username',
@@ -75,10 +79,15 @@ class Auth extends CI_Controller {
 			}
         }
 	}
+
     public function login(){
         $this->load->database();
 		$this->load->helper(array('form', 'url'));
         $this->load->library(array('form_validation', 'session'));
+
+		if($this->session->is_logged){
+			redirect(base_url('index.php/content'));
+		}
 
 		$form_rules = array(
 			array(
