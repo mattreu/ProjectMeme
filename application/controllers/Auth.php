@@ -67,8 +67,12 @@ class Auth extends CI_Controller {
         {
 			$password = $_POST['password'];
 			$hashed_password = password_hash($password, PASSWORD_BCRYPT);
-			$query = 'INSERT INTO `users`(`username`, `email`, `password`) VALUES ("'.$_POST['username'].'","'.$_POST['email'].'","'.$hashed_password.'")';
-			if($this->db->simple_query($query)){
+			$insertdata = array(
+				'username' => $_POST['username'],
+				'email' => $_POST['email'],
+				'password' => $hashed_password
+			);
+			if($this->db->insert('users', $insertdata)){
 				$this->session->is_logged = TRUE;
 				$this->session->username = $_POST['username'];
             	redirect(base_url('index.php/content'), 'location');
@@ -102,12 +106,9 @@ class Auth extends CI_Controller {
 			array(
 				'field' => 'password',
 				'label' => 'Password',
-				'rules' => 'required|min_length[8]|max_length[20]|regex_match[/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/]',
+				'rules' => 'required',
 				'errors' => array(
-					'required' => '%s field is required.',
-					'min_length' => '%s must be at least 8 characters long.',
-					'max_length' => '%s must not exceed 20 characters.',
-					'regex_match' => '%s must contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'
+					'required' => '%s field is required.'
 				)
 			),
 		);
