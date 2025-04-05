@@ -16,6 +16,7 @@
 					<div class="image_container">
 						<img src="<?=base_url('assets/images/'.$image['location']);?>">
 						<p>by <?=$image['username']?> on <?=$image['created_at']?></p>
+						<p><a href="<?=base_url('index.php/content/add_caption/'.$image['img_id']); ?>">Add caption</a></p>
 					</div>
 				<?php endforeach ?>
 			<?php endif ?>

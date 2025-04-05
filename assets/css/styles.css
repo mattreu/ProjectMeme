@@ -52,6 +52,11 @@ code {
 	min-height: 96px;
 }
 
+#form_with_preview {
+	display: grid;
+	grid-template: 1fr  / 1fr 1fr;
+}
+
 p {
 	margin: 0 0 10px;
 	padding: 0;
