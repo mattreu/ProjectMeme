@@ -41,6 +41,10 @@ class Content extends CI_Controller {
 
 		if (!$this->upload->do_upload('image')) {
 			$error = ['error' => $this->upload->display_errors()];
+			$this->load->view('header', [
+				'is_logged' => $this->session->is_logged,
+				'username' => $this->session->username,
+			]);
 			$this->load->view('upload_form', $error);
 		} else {
 			$upload_data = $this->upload->data();
@@ -52,6 +56,10 @@ class Content extends CI_Controller {
 				redirect(base_url('index.php/content'));
 			} else {
 				$this->session->set_flashdata('error', 'Failed to save image data. Please try again.');
+				$this->load->view('header', [
+					'is_logged' => $this->session->is_logged,
+					'username' => $this->session->username,
+				]);
 				$this->load->view('upload_form');
 			}
 		}
@@ -83,6 +91,10 @@ class Content extends CI_Controller {
 		]);
 
 		if ($this->form_validation->run() == false) {
+			$this->load->view('header', [
+				'is_logged' => $this->session->is_logged,
+				'username' => $this->session->username,
+			]);
 			$this->load->view('caption_form', [
 				'location' => $image->location,
 				'id' => $id,
