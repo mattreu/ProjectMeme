@@ -4,108 +4,108 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Content extends CI_Controller {
 	public function index()
 	{
-		$this->load->database();
 		$this->load->helper('url');
 		$this->load->library('session');
-
-		if(!$this->session->is_logged){
-			redirect(base_url('index.php/auth/login'));
-		}
-
-		$this->load->view('header', array(
-			'is_logged' => $this->session->is_logged,
-			'username' => $this->session->username
-		));
-
-		$this->db->select('images.id as img_id, username, location, images.created_at');
-		$this->db->from('images');
-		$this->db->join('users', 'images.user_id = users.id');
-		$this->db->order_by('images.created_at', 'DESC');
-		$images = $this->db->get();
-		if($images->num_rows() > 0){
-			$data['images'] = $images->result_array();
-		}
-		else{
-			$data['images'] = [];
-		}
-		$this->load->view('content', $data);
-	}
-
-	public function add(){
-		$this->load->database();
-		$this->load->helper(array('form', 'url'));
-		$this->load->library('session');
-
-		if(!$this->session->is_logged){
-			redirect(base_url('index.php/auth/login'));
-		}
-
-		$config['upload_path'] = './assets/images/';
-        $config['allowed_types'] = 'gif|jpg|png';
-        $config['max_size'] = 100;
-        $config['max_width'] = 1024;
-        $config['max_height'] = 768;
-        $this->load->library('upload', $config);
-
-        if ( ! $this->upload->do_upload('image')){
-            $error = array('error' => $this->upload->display_errors());
-			$this->load->view('upload_form', $error);
-        }
-        else{
-            $uploaddata = $this->upload->data();
-			$filename = $uploaddata['file_name'];
-			$user = $this->db->select('id')->from('users')->where('username', $this->session->username)->get();
-			$userid = $user->result_array()[0]['id'];
-			$insertdata = array(
-				'user_id' => $userid,
-				'location' => $filename
-			);
-			$this->db->insert('images', $insertdata);
-			redirect(base_url('index.php/content'));
-        }
-	}
-
-	public function add_caption($id)
-	{
-		$this->load->database();
-		$this->load->helper(array('form', 'url'));
-		$this->load->library(array('session', 'form_validation'));
+		$this->load->model('Image_model');
 
 		if (!$this->session->is_logged) {
 			redirect(base_url('index.php/auth/login'));
 		}
-		$result = $this->db->get_where('images', array('id' => $id));
-		if ($result->num_rows() == 1) {
-			$image = $result->row();
-			$location = $image->location;
-			$form_rules = array(
-				array(
-					'field' => 'text',
-					'label' => 'Caption',
-					'rules' => 'required',
-					'errors' => array(
-						'required' => '%s field is required.'
-					)
-				)
-			);
-			$this->form_validation->set_rules($form_rules);
 
-			if ($this->form_validation->run() == FALSE) {
-				$this->load->view('caption_form', array('location' => $location, 'id' => $id));
-			} else {
-				$this->caption($location, $_POST['text'], $_POST['black_area_height'], $_POST['text_x'], $_POST['text_y'], true);
-				redirect(base_url('index.php/content'));
-			}
+		$data['images'] = $this->Image_model->get_all_images_with_users();
+
+		$this->load->view('header', [
+			'is_logged' => $this->session->is_logged,
+			'username' => $this->session->username,
+		]);
+		$this->load->view('content', $data);
+	}
+
+	public function add()
+	{
+		$this->load->helper(['form', 'url']);
+		$this->load->library(['session', 'upload']);
+		$this->load->model(['Image_model', 'User_model']);
+
+		if (!$this->session->is_logged) {
+			redirect(base_url('index.php/auth/login'));
+		}
+
+		$config['upload_path'] = './assets/images/';
+		$config['allowed_types'] = 'gif|jpg|png';
+		$config['max_size'] = 100;
+		$config['max_width'] = 1024;
+		$config['max_height'] = 768;
+
+		$this->upload->initialize($config);
+
+		if (!$this->upload->do_upload('image')) {
+			$error = ['error' => $this->upload->display_errors()];
+			$this->load->view('upload_form', $error);
 		} else {
+			$upload_data = $this->upload->data();
+			$filename = $upload_data['file_name'];
+
+			$user_id = $this->User_model->get_user_id_by_username($this->session->username);
+
+			if ($this->Image_model->save_image($user_id, $filename)) {
+				redirect(base_url('index.php/content'));
+			} else {
+				$this->session->set_flashdata('error', 'Failed to save image data. Please try again.');
+				$this->load->view('upload_form');
+			}
+		}
+	}
+
+	public function add_caption($id)
+	{
+		$this->load->helper(['form', 'url']);
+		$this->load->library(['session', 'form_validation']);
+		$this->load->model('Image_model');
+
+		if (!$this->session->is_logged) {
+			redirect(base_url('index.php/auth/login'));
+		}
+
+		$image = $this->Image_model->get_image_by_id($id);
+
+		if (!$image) {
+			redirect(base_url('index.php/content'));
+		}
+
+		$this->form_validation->set_rules([
+			[
+				'field' => 'text',
+				'label' => 'Caption',
+				'rules' => 'required',
+				'errors' => ['required' => '%s field is required.'],
+			],
+		]);
+
+		if ($this->form_validation->run() == false) {
+			$this->load->view('caption_form', [
+				'location' => $image->location,
+				'id' => $id,
+			]);
+		} else {
+			$this->caption(
+				$image->location,
+				$this->input->post('text'),
+				$this->input->post('black_area_height', TRUE) ?? 50,
+				$this->input->post('text_x', TRUE) ?? 4,
+				$this->input->post('text_y', TRUE) ?? 20,
+				true
+			);
+
 			redirect(base_url('index.php/content'));
 		}
 	}
 
 	public function caption($location, $text, $black_area_height = 50, $text_x = 4, $text_y = 20, $save = false)
 	{
-		$this->load->database();
 		$this->load->helper(array('form', 'url'));
 		$this->load->library(array('session'));
+		$this->load->model(['Image_model', 'User_model']);
 
 		if (!$this->session->is_logged) {
 			exit();
@@ -158,13 +158,8 @@ class Content extends CI_Controller {
 		$new_location = $random_part . '_' .$filename_part . '.' . $extension_part;
 		$new_path = 'assets/images/' . $new_location;
 		if($save){
-			$user = $this->db->select('id')->from('users')->where('username', $this->session->username)->get();
-			$userid = $user->result_array()[0]['id'];
-			$insertdata = array(
-				'user_id' => $userid,
-				'location' => $new_location
-			);
-			$this->db->insert('images', $insertdata);
+			$user_id = $this->User_model->get_user_id_by_username($this->session->username);
+			$this->Image_model->save_image($user_id, $new_location);
 		}
 		else{
 			header('Content-Type: ' . $mime);
@@ -174,7 +169,7 @@ class Content extends CI_Controller {
 				imagejpeg($new_image, $save ? $new_path : null, 100);
 				break;
 			case 'image/png':
-				imagepng($new_image, $save ? $new_path : null, 100);
+				imagepng($new_image, $save ? $new_path : null, 0);
 				break;
 			default:
 				break;
@@ -200,7 +195,7 @@ class Content extends CI_Controller {
 		// black area and caption on each frame
 		foreach ($original_image as $frame) {
 			$frame = clone $frame;
-			$frame->setImageDispose(Imagick::DISPOSE_NONE);
+			$frame->setImageDispose(Imagick::DISPOSE_NONE); // stacking background
 			$frame->setImageBackgroundColor(new ImagickPixel('transparent'));
 			$frame->setImageExtent($width, $new_height);
 
@@ -231,13 +226,8 @@ class Content extends CI_Controller {
 			$new_location = $random_part . '_' .$filename_part . '.' . $extension_part;
 			$new_path = 'assets/images/' . $new_location;
 
-			$user = $this->db->select('id')->from('users')->where('username', $this->session->username)->get();
-			$userid = $user->result_array()[0]['id'];
-			$insertdata = array(
-				'user_id' => $userid,
-				'location' => $new_location
-			);
-			$this->db->insert('images', $insertdata);
+			$user_id = $this->User_model->get_user_id_by_username($this->session->username);
+			$this->Image_model->save_image($user_id, $new_location);
 
 			$new_image_data = $new_image->getImagesBlob();
 			file_put_contents($new_path, $new_image_data);
